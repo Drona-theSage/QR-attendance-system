@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
 
 export function createToken() {
+  // A random token prevents students from guessing another active session URL.
   return crypto.randomBytes(24).toString('hex');
 }
 
 export function distanceInMeters(firstLatitude, firstLongitude, secondLatitude, secondLongitude) {
+  // Haversine distance converts two latitude/longitude pairs into meters.
   const earthRadius = 6371000;
   const toRadians = (degrees) => degrees * (Math.PI / 180);
   const latitudeDifference = toRadians(secondLatitude - firstLatitude);
@@ -18,6 +20,20 @@ export function distanceInMeters(firstLatitude, firstLongitude, secondLatitude, 
 }
 
 export function isUniversityEmail(email) {
+  // Allow the configured domain and any subdomain, such as cs.du.ac.in.
   const domain = process.env.UNIVERSITY_EMAIL_DOMAIN || 'university.ac.in';
-  return new RegExp(`^[^@\\s]+@${domain.replace('.', '\\.')}$`, 'i').test(email);
+  const domainParts = domain.split('.');
+  const acceptedDomains = [domain];
+
+  if (domainParts.length > 2) {
+    acceptedDomains.push(domainParts.slice(1).join('.'));
+  }
+
+  const escapedDomains = acceptedDomains.map((acceptedDomain) => (
+    acceptedDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  ));
+  return new RegExp(
+    `^[^@\\s]+@(?:[A-Za-z0-9-]+\\.)*(?:${escapedDomains.join('|')})$`,
+    'i',
+  ).test(email);
 }

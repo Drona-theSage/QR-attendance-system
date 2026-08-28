@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import apiRouter from './routes.js';
+import { connectDb } from './db.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -21,18 +22,28 @@ app.use((_request, response) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  const server = app.listen(port, () => {
-    console.log(`QR attendance API listening on http://localhost:${port}`);
-  });
+  const startServer = async () => {
+    try {
+      await connectDb();
+      const server = app.listen(port, () => {
+        console.log(`QR attendance API listening on http://localhost:${port}`);
+      });
 
-  server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-      console.error(`Port ${port} is already in use. Stop the existing server or choose another PORT in server/.env.`);
-    } else {
-      console.error('Unable to start the QR attendance API:', error.message);
+      server.on('error', (error) => {
+        if (error.code === 'EADDRINUSE') {
+          console.error(`Port ${port} is already in use. Stop the existing server or choose another PORT in server/.env.`);
+        } else {
+          console.error('Unable to start the QR attendance API:', error.message);
+        }
+        process.exitCode = 1;
+      });
+    } catch (error) {
+      console.error('Unable to connect to MongoDB:', error.message);
+      process.exitCode = 1;
     }
-    process.exitCode = 1;
-  });
+  };
+
+  startServer();
 }
 
 export { app };
