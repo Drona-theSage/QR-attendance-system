@@ -7,6 +7,8 @@ const adminUserSchema = new mongoose.Schema({
   course: { type: String, required: true, trim: true },
   courseDuration: { type: String, required: true, trim: true },
   role: { type: String, enum: ['admin'], default: 'admin' },
+  resetToken: { type: String, default: null },
+  resetTokenExpiresAt: { type: Date, default: null },
 }, { timestamps: true });
 
 // Each admin has their own subject catalog scoped to their course, so one email cannot be reused for a different course.
@@ -41,6 +43,8 @@ const sessionSchema = new mongoose.Schema({
 const attendanceRecordSchema = new mongoose.Schema({
   sessionToken: { type: String, required: true },
   studentEmail: { type: String, required: true },
+  studentName: { type: String, trim: true },
+  studentRollNumber: { type: String, trim: true },
   subject: { type: String, required: true },
   latitude: { type: Number, required: true },
   longitude: { type: Number, required: true },

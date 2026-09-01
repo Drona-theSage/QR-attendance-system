@@ -20,18 +20,19 @@ export function distanceInMeters(firstLatitude, firstLongitude, secondLatitude, 
 }
 
 export function isUniversityEmail(email) {
-  // Allow the configured domain and any subdomain, such as cs.du.ac.in.
+  // Accept the configured university domain and its academic parent domains.
   const domain = process.env.UNIVERSITY_EMAIL_DOMAIN || 'university.ac.in';
-  const domainParts = domain.split('.');
-  const acceptedDomains = [domain];
+  const domainParts = domain.split('.').filter(Boolean);
+  const acceptedDomains = new Set([domain]);
 
-  if (domainParts.length > 2) {
-    acceptedDomains.push(domainParts.slice(1).join('.'));
+  for (let index = 1; index < domainParts.length; index += 1) {
+    acceptedDomains.add(domainParts.slice(index).join('.'));
   }
 
-  const escapedDomains = acceptedDomains.map((acceptedDomain) => (
+  const escapedDomains = [...acceptedDomains].map((acceptedDomain) => (
     acceptedDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   ));
+
   return new RegExp(
     `^[^@\\s]+@(?:[A-Za-z0-9-]+\\.)*(?:${escapedDomains.join('|')})$`,
     'i',

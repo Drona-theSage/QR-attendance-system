@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { AdminUser, AttendanceRecord, AttendanceSession, Subject } from "./models.js";
 import { clearAuthCookie, createAuthCookie, hashPassword, requireAdmin, verifyPassword } from "./auth.js";
 import { createToken, distanceInMeters, isUniversityEmail } from "./utils.js";
+import nodemailer from "nodemailer";
 
 const router = Router();
 
@@ -87,6 +88,98 @@ router.post("/auth/register", async (request, response) => {
   }
 });
 
+router.post("/auth/forgot-password", async (request, response) => {
+  const email = request.body.email?.trim().toLowerCase();
+  if (!email) {
+    return response.status(400).json({ error: "Email is required." });
+  }
+
+  const user = await AdminUser.findOne({ email });
+  if (!user) {
+    return response.status(404).json({ error: "No admin account exists for this email." });
+  }
+
+  const resetToken = createToken();
+  const resetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  user.resetToken = resetToken;
+  user.resetTokenExpiresAt = resetTokenExpiresAt;
+  await user.save();
+
+  const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/reset-password?token=${encodeURIComponent(resetToken)}`;
+
+  const hasSmtpCredentials = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+
+  if (!hasSmtpCredentials) {
+    console.log(`Password reset requested for ${user.email}. Reset link: ${resetUrl}`);
+    return response.json({
+      message: "A password reset link has been generated. Configure SMTP credentials to email it automatically.",
+      resetUrl,
+    });
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@localhost",
+      to: user.email,
+      subject: "Reset your QR Attendance admin password",
+      html: `
+        <p>Hello ${user.name},</p>
+        <p>We received a request to reset your admin password.</p>
+        <p><a href="${resetUrl}">Click here to reset your password</a></p>
+        <p>This link expires in 1 hour.</p>
+      `,
+      text: `Hello ${user.name},\n\nClick the following link to reset your password:\n${resetUrl}\n\nThis link expires in 1 hour.`,
+    });
+  } catch (error) {
+    console.error("Password reset email send failed:", error.message);
+    return response.status(500).json({
+      error: "Unable to send the reset email right now. Please try again later.",
+      resetUrl,
+    });
+  }
+
+  return response.json({
+    message: "A password reset link has been sent to your email.",
+    resetUrl,
+  });
+});
+
+router.post("/auth/reset-password", async (request, response) => {
+  const { token, password } = request.body;
+  if (!token || !password || String(password).length < 8) {
+    return response.status(400).json({ error: "A valid reset token and a password with at least 8 characters are required." });
+  }
+
+  const user = await AdminUser.findOne({ resetToken: token });
+  if (!user) {
+    return response.status(400).json({ error: "This reset link is invalid or has already been used." });
+  }
+
+  if (!user.resetTokenExpiresAt || new Date(user.resetTokenExpiresAt) < new Date()) {
+    user.resetToken = null;
+    user.resetTokenExpiresAt = null;
+    await user.save();
+    return response.status(400).json({ error: "This reset link has expired. Request a new one." });
+  }
+
+  user.passwordHash = await hashPassword(String(password));
+  user.resetToken = null;
+  user.resetTokenExpiresAt = null;
+  await user.save();
+
+  return response.json({ message: "Password updated successfully." });
+});
 
 //login route
 router.post("/auth/login", async (request, response) => {
@@ -166,6 +259,16 @@ router.post("/admin/subjects", requireAdmin, async (request, response) => {
   return response.status(201).json(subject);
 });
 
+router.delete("/admin/subjects/:id", requireAdmin, async (request, response) => {
+  const subject = await Subject.findOne({ id: request.params.id, adminId: request.adminUserId });
+  if (!subject) {
+    return response.status(404).json({ error: "Subject not found." });
+  }
+
+  await Subject.deleteOne({ _id: subject._id });
+  return response.json({ ok: true, deletedId: subject.id });
+});
+
 router.post("/admin/sessions", requireAdmin, async (request, response) => {
   // Accept either a catalog subject ID or a new subject name from the admin form.
   const { subjectId, subjectName, subjectCode, course, latitude, longitude } = request.body;
@@ -215,6 +318,35 @@ router.post("/admin/sessions", requireAdmin, async (request, response) => {
   });
 });
 
+router.get("/admin/history", requireAdmin, async (request, response) => {
+  const sessions = await AttendanceSession.find({ createdBy: request.adminUserId })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const sessionSummaries = await Promise.all(sessions.map(async (session) => {
+    const attendance = await AttendanceRecord.find({ sessionToken: session.token }).lean();
+    return {
+      id: session.id,
+      token: session.token,
+      course: session.course,
+      subject: session.subject,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      status: new Date() >= new Date(session.expiresAt) ? "expired" : session.status,
+      attendanceCount: attendance.length,
+      studentUrl: `${process.env.FRONTEND_URL || "http://localhost:5173"}/attendance/${session.token}`,
+    };
+  }));
+
+  const totalAttendance = sessionSummaries.reduce((sum, item) => sum + item.attendanceCount, 0);
+
+  return response.json({
+    totalSessions: sessionSummaries.length,
+    totalAttendance,
+    sessions: sessionSummaries,
+  });
+});
+
 router.get("/admin/sessions/:token", requireAdmin, async (request, response) => {
   // The admin view uses this endpoint to refresh the current attendance list.
   const session = await AttendanceSession.findOne({ token: request.params.token }).lean();
@@ -239,6 +371,50 @@ router.post("/admin/sessions/:token/end", requireAdmin, async (request, response
   return response.json(session.toObject());
 });
 
+router.post("/admin/sessions/:token/manual-mark", requireAdmin, async (request, response) => {
+  const session = await AttendanceSession.findOne({ token: request.params.token, createdBy: request.adminUserId });
+  if (!session) {
+    return response.status(404).json({ error: "Session not found." });
+  }
+
+  const { studentName, classRollNumber, email } = request.body;
+  const trimmedName = String(studentName || "").trim();
+  const trimmedRoll = String(classRollNumber || "").trim();
+  const normalizedEmail = email ? String(email).trim().toLowerCase() : `${trimmedName.toLowerCase().replace(/[^a-z0-9]/g, "") || "manual"}@manual.local`;
+
+  if (!trimmedName || !trimmedRoll) {
+    return response.status(400).json({ error: "Student name and class roll number are required." });
+  }
+
+  const duplicate = await AttendanceRecord.findOne({
+    sessionToken: session.token,
+    $or: [
+      { studentEmail: normalizedEmail },
+      { studentName: trimmedName, studentRollNumber: trimmedRoll },
+    ],
+  });
+
+  if (duplicate) {
+    return response.status(409).json({ error: "This student is already marked for this session." });
+  }
+
+  const record = await AttendanceRecord.create({
+    sessionToken: session.token,
+    studentEmail: normalizedEmail,
+    studentName: trimmedName,
+    studentRollNumber: trimmedRoll,
+    subject: session.subject.name,
+    latitude: session.latitude,
+    longitude: session.longitude,
+    accuracy: 0,
+    distance: 0,
+    status: "present",
+    timestamp: new Date(),
+  });
+
+  return response.status(201).json(record.toObject());
+});
+
 router.get("/attendance/session/:token", async (request, response) => {
   // Students receive only the public session details needed to check in.
   const session = await AttendanceSession.findOne({ token: request.params.token }).lean();
@@ -260,13 +436,20 @@ router.get("/attendance/session/:token", async (request, response) => {
 router.post("/attendance/:token/mark", async (request, response) => {
   // Validate every attendance condition on the server; the browser is not trusted.
   const session = await AttendanceSession.findOne({ token: request.params.token });
-  const { email, latitude, longitude, accuracy } = request.body;
+  const { email, name, classRollNumber, latitude, longitude, accuracy } = request.body;
+  const studentName = String(name || "").trim();
+  const studentRollNumber = String(classRollNumber || "").trim();
+
   if (!session)
     return response.status(404).json({ error: "QR session not found." });
   if (session.status !== "active" || new Date() >= new Date(session.expiresAt))
     return response
       .status(410)
       .json({ error: "This attendance session has expired or ended." });
+  if (!studentName || !studentRollNumber)
+    return response
+      .status(400)
+      .json({ error: "Student name and class roll number are required." });
   if (!isUniversityEmail(email))
     return response
       .status(403)
@@ -298,7 +481,10 @@ router.post("/attendance/:token/mark", async (request, response) => {
 
   const existingRecord = await AttendanceRecord.findOne({
     sessionToken: session.token,
-    studentEmail: email.toLowerCase(),
+    $or: [
+      { studentEmail: String(email).trim().toLowerCase() },
+      { studentName, studentRollNumber },
+    ],
   });
 
   if (existingRecord)
@@ -308,7 +494,9 @@ router.post("/attendance/:token/mark", async (request, response) => {
 
   const record = await AttendanceRecord.create({
     sessionToken: session.token,
-    studentEmail: email.toLowerCase(),
+    studentEmail: String(email).trim().toLowerCase(),
+    studentName,
+    studentRollNumber,
     subject: session.subject.name,
     latitude,
     longitude,

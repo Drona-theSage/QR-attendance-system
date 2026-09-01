@@ -57,6 +57,32 @@ function useLocation() {
   return { ...state, locate };
 }
 
+function HistorySummary({ history }) {
+  if (!history || history.sessions.length === 0) {
+    return (
+      <section className="panel">
+        <h3>Session history</h3>
+        <p className="muted">No sessions created yet.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel">
+      <h3>Session history</h3>
+      <p className="muted">Total sessions: {history.totalSessions} · Total attendance: {history.totalAttendance}</p>
+      <ul>
+        {history.sessions.map((item) => (
+          <li key={item.token}>
+            <strong>{item.course}</strong> · {item.subject?.name || 'Subject'} · {item.attendanceCount} present
+            <div className="muted">{new Date(item.createdAt).toLocaleString()} · {item.status}</div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Admin() {
   const location = useLocation();
   const [subjects, setSubjects] = useState([]);
@@ -65,11 +91,31 @@ function Admin() {
   const [customSubjectName, setCustomSubjectName] = useState('');
   const [customSubjectCode, setCustomSubjectCode] = useState('');
   const [session, setSession] = useState(null);
+  const [history, setHistory] = useState({ totalSessions: 0, totalAttendance: 0, sessions: [] });
   const [error, setError] = useState('');
 
   async function logout() {
     await request('/auth/logout', { method: 'POST' });
     window.location.reload();
+  }
+
+  async function deleteSubject(subjectIdToDelete) {
+    try {
+      await request(`/admin/subjects/${subjectIdToDelete}`, { method: 'DELETE' });
+
+      setSubjects((items) => {
+        const nextItems = items.filter((item) => item.id !== subjectIdToDelete);
+        setSubjectId((current) => {
+          if (current === subjectIdToDelete) {
+            return nextItems[0]?.id || '';
+          }
+          return current;
+        });
+        return nextItems;
+      });
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   useEffect(() => {
@@ -80,6 +126,10 @@ function Admin() {
         setSubjectId(items[0]?.id || '');
       })
       .catch((err) => setError(err.message));
+
+    request('/admin/history')
+      .then(setHistory)
+      .catch(() => setHistory({ totalSessions: 0, totalAttendance: 0, sessions: [] }));
   }, []);
 
   async function startSession() {
@@ -115,12 +165,14 @@ function Admin() {
         payload.subjectId = subjectId;
       }
 
-      setSession(
-        await request('/admin/sessions', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        }),
-      );
+      const createdSession = await request('/admin/sessions', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      setSession(createdSession);
+      const nextHistory = await request('/admin/history');
+      setHistory(nextHistory);
     } catch (err) {
       setError(err.message);
     }
@@ -136,66 +188,73 @@ function Admin() {
       <button type="button" className="secondary-button" onClick={logout}>Log out</button>
 
       {!session ? (
-        <section className="panel">
-          <label>
-            Course
-            <input
-              type="text"
-              value={course}
-              onChange={(event) => setCourse(event.target.value)}
-              placeholder="e.g. BSc Computer Science"
-            />
-          </label>
+        <>
+          <section className="panel">
+            <label>
+              Course
+              <input
+                type="text"
+                value={course}
+                onChange={(event) => setCourse(event.target.value)}
+                placeholder="e.g. BSc Computer Science"
+              />
+            </label>
 
-          <label>
-            Existing subject
-            <select
-              value={subjectId}
-              onChange={(event) => setSubjectId(event.target.value)}
-            >
-              {subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.code} · {subject.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label>
+              Existing subject
+              <select
+                value={subjectId}
+                onChange={(event) => setSubjectId(event.target.value)}
+              >
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.code} · {subject.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label>
-            Or create a custom subject
-            <input
-              type="text"
-              value={customSubjectName}
-              onChange={(event) => setCustomSubjectName(event.target.value)}
-              placeholder="e.g. Advanced Web Development"
-            />
-          </label>
+            <label>
+              Or create a custom subject
+              <input
+                type="text"
+                value={customSubjectName}
+                onChange={(event) => setCustomSubjectName(event.target.value)}
+                placeholder="e.g. Advanced Web Development"
+              />
+            </label>
 
-          <label>
-            Custom subject code
-            <input
-              type="text"
-              value={customSubjectCode}
-              onChange={(event) => setCustomSubjectCode(event.target.value)}
-              placeholder="e.g. AWD"
-            />
-          </label>
+            <label>
+              Custom subject code
+              <input
+                type="text"
+                value={customSubjectCode}
+                onChange={(event) => setCustomSubjectCode(event.target.value)}
+                placeholder="e.g. AWD"
+              />
+            </label>
 
-          <button onClick={startSession}>
-            {location.loading ? 'Getting location...' : 'Start session'}
-          </button>
+            <button onClick={startSession}>
+              {location.loading ? 'Getting location...' : 'Start session'}
+            </button>
 
-          {location.error && (
-            <p className="error">Location error: {location.error}</p>
-          )}
-          {error && <p className="error">{error}</p>}
-        </section>
+            {location.error && (
+              <p className="error">Location error: {location.error}</p>
+            )}
+            {error && <p className="error">{error}</p>}
+          </section>
+          <HistorySummary history={history} />
+        </>
       ) : (
-        <Session session={session} />
+        <>
+          <Session session={session} />
+          <HistorySummary history={history} />
+        </>
       )}
     </main>
   );
 }
+
 
 function Auth({ onAuthenticated }) {
   const [mode, setMode] = useState('login');
@@ -205,14 +264,26 @@ function Auth({ onAuthenticated }) {
   const [course, setCourse] = useState('');
   const [courseDuration, setCourseDuration] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function submit(event) {
     event.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
+      if (mode === 'forgot-password') {
+        const response = await request('/auth/forgot-password', {
+          method: 'POST',
+          body: JSON.stringify({ email }),
+        });
+        setSuccess(response.message || 'Password reset link generated.');
+        setMode('login');
+        return;
+      }
+
       const body = { email, password };
       if (mode === 'register') {
         body.name = name;
@@ -231,15 +302,18 @@ function Auth({ onAuthenticated }) {
     }
   }
 
+  const heading = mode === 'login' ? 'Welcome back.' : mode === 'register' ? 'Create admin access.' : 'Reset your password.';
+  const intro = mode === 'login'
+    ? 'Sign in to create and monitor attendance sessions.'
+    : mode === 'register'
+      ? 'Register as a class representative or session creator.'
+      : 'Enter your email to receive a password reset link.';
+
   return (
     <main className="shell">
       <p className="eyebrow">MVP / ADMIN ACCESS</p>
-      <h1>{mode === 'login' ? 'Welcome back.' : 'Create admin access.'}</h1>
-      <p className="intro">
-        {mode === 'login'
-          ? 'Sign in to create and monitor attendance sessions.'
-          : 'Register as a class representative or session creator.'}
-      </p>
+      <h1>{heading}</h1>
+      <p className="intro">{intro}</p>
 
       <form className="panel" onSubmit={submit}>
         {mode === 'register' && (
@@ -262,21 +336,96 @@ function Auth({ onAuthenticated }) {
           Email
           <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
         </label>
-        <label>
-          Password
-          <input type="password" minLength="8" value={password} onChange={(event) => setPassword(event.target.value)} required />
-        </label>
+        {mode !== 'forgot-password' && (
+          <label>
+            Password
+            <input type="password" minLength="8" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          </label>
+        )}
         <button type="submit" disabled={loading}>
-          {loading ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Create account'}
+          {loading ? 'Please wait...' : mode === 'login' ? 'Log in' : mode === 'register' ? 'Create account' : 'Send reset link'}
         </button>
         {error && <p className="error">{error}</p>}
+        {success && <p className="success">{success}</p>}
         <button
           type="button"
           className="link-button"
-          onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
+          onClick={() => {
+            setMode(mode === 'login' ? 'register' : mode === 'register' ? 'login' : 'login');
+            setError('');
+            setSuccess('');
+          }}
         >
-          {mode === 'login' ? 'Create a session creator account' : 'Back to admin login'}
+          {mode === 'login' ? 'Create a session creator account' : mode === 'register' ? 'Back to admin login' : 'Back to admin login'}
         </button>
+        {mode === 'login' && (
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => { setMode('forgot-password'); setError(''); setSuccess(''); }}
+          >
+            Forgot password?
+          </button>
+        )}
+      </form>
+    </main>
+  );
+}
+
+function ResetPassword() {
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const token = new URLSearchParams(window.location.search).get('token');
+
+  async function submit(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    setLoading(true);
+
+    try {
+      const response = await request('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, password }),
+      });
+      setMessage(response.message || 'Password updated successfully.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!token) {
+    return (
+      <main className="shell">
+        <p className="eyebrow">MVP / RESET PASSWORD</p>
+        <section className="panel">
+          <p className="error">This reset link is missing a valid token.</p>
+          <a href="/" className="link-button">Return to login</a>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="shell">
+      <p className="eyebrow">MVP / RESET PASSWORD</p>
+      <h1>Set a new password.</h1>
+      <form className="panel" onSubmit={submit}>
+        <label>
+          New password
+          <input type="password" minLength="8" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        </label>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Please wait...' : 'Update password'}
+        </button>
+        {error && <p className="error">{error}</p>}
+        {message && <p className="success">{message}</p>}
+        {message && <a href="/" className="link-button">Back to login</a>}
       </form>
     </main>
   );
@@ -303,6 +452,10 @@ function Session({ session }) {
   const [remaining, setRemaining] = useState(Math.max(0, new Date(session.expiresAt) - Date.now()));
   const [records, setRecords] = useState([]);
   const [copied, setCopied] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualRoll, setManualRoll] = useState('');
+  const [manualEmail, setManualEmail] = useState('');
+  const [manualMessage, setManualMessage] = useState('');
 
   useEffect(() => {
     // Keep the countdown synchronized with the server-provided expiry time.
@@ -336,6 +489,29 @@ function Session({ session }) {
     }
   }
 
+  async function submitManualAttendance(event) {
+    event.preventDefault();
+    setManualMessage('');
+
+    try {
+      await request(`/admin/sessions/${session.token}/manual-mark`, {
+        method: 'POST',
+        body: JSON.stringify({
+          studentName: manualName,
+          classRollNumber: manualRoll,
+          email: manualEmail,
+        }),
+      });
+      setManualName('');
+      setManualRoll('');
+      setManualEmail('');
+      const data = await request(`/admin/sessions/${session.token}`);
+      setRecords(data.attendance);
+    } catch (error) {
+      setManualMessage(error.message);
+    }
+  }
+
   const minutes = String(Math.floor(remaining / 60000)).padStart(2, '0');
   const seconds = String(Math.floor(remaining / 1000) % 60).padStart(2, '0');
 
@@ -366,6 +542,26 @@ function Session({ session }) {
           </div>
         </div>
       </div>
+
+      <div className="panel">
+        <h3>Manual attendance</h3>
+        <form onSubmit={submitManualAttendance}>
+          <label>
+            Student name
+            <input value={manualName} onChange={(event) => setManualName(event.target.value)} required />
+          </label>
+          <label>
+            Class roll number
+            <input value={manualRoll} onChange={(event) => setManualRoll(event.target.value)} required />
+          </label>
+          <label>
+            University email (optional for admin entry)
+            <input type="email" value={manualEmail} onChange={(event) => setManualEmail(event.target.value)} />
+          </label>
+          <button type="submit">Add attendance manually</button>
+        </form>
+        {manualMessage && <p className="error">{manualMessage}</p>}
+      </div>
     </section>
   );
 }
@@ -374,6 +570,8 @@ function Student({ token }) {
   const location = useLocation();
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [classRollNumber, setClassRollNumber] = useState('');
   const [message, setMessage] = useState('');
   const [done, setDone] = useState(false);
 
@@ -396,7 +594,7 @@ function Student({ token }) {
     try {
       await request(`/attendance/${token}/mark`, {
         method: 'POST',
-        body: JSON.stringify({ email, ...location.value }),
+        body: JSON.stringify({ email, name, classRollNumber, ...location.value }),
       });
       setDone(true);
     } catch (err) {
@@ -441,6 +639,26 @@ function Student({ token }) {
 
       <section className="panel">
         <label>
+          Full name
+          <input
+            type="text"
+            placeholder="Enter your full name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+
+        <label>
+          Class roll number
+          <input
+            type="text"
+            placeholder="e.g. 22MCA-14"
+            value={classRollNumber}
+            onChange={(event) => setClassRollNumber(event.target.value)}
+          />
+        </label>
+
+        <label>
           University email
           <input
             type="email"
@@ -451,7 +669,7 @@ function Student({ token }) {
         </label>
 
         <button
-          disabled={!session || !email}
+          disabled={!session || !email || !name || !classRollNumber}
           onClick={markAttendance}
         >
           {location.loading ? 'Getting location...' : 'Mark attendance'}
@@ -470,9 +688,18 @@ function Student({ token }) {
 
 function App() {
   const path = window.location.pathname;
-  const match = path.match(/^\/attendance\/([^/]+)/);
+  const studentMatch = path.match(/^\/attendance\/([^/]+)/);
+  const resetMatch = path.match(/^\/reset-password/);
 
-  return match ? <Student token={match[1]} /> : <AdminGate />;
+  if (studentMatch) {
+    return <Student token={studentMatch[1]} />;
+  }
+
+  if (resetMatch) {
+    return <ResetPassword />;
+  }
+
+  return <AdminGate />;
 }
 
 createRoot(document.getElementById('root')).render(
