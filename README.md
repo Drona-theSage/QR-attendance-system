@@ -61,15 +61,28 @@ The session creation flow now supports:
 - Optional custom subject codes.
 - Course and subject details shown to students before check-in and after successful attendance.
 
-### Phase 6: Next execution order
+### Phase 6: Add admin authentication
+
+Admin authentication is now implemented:
+
+- Session creators can register through the registration form.
+- Multiple session creators can register; there is no one-admin limitation.
+- Passwords are hashed with bcrypt and never stored or returned as plain text.
+- Login returns an `httpOnly` JWT cookie.
+- Admin session and subject-management routes require authentication.
+- Student QR attendance routes remain public to anyone holding a valid session link.
+
+### Phase 7: Next execution order
 
 The agreed order from here is:
 
-1. Add admin login authentication and protect admin routes.
-2. Migrate subjects from the temporary store into MongoDB.
-3. Build admin session history and attendance reporting.
+1. Migrate subjects from the temporary store into MongoDB.
+2. Build admin session history and attendance reporting.
+3. Add further production hardening such as rate limiting and deployment configuration.
 
 Students will continue using the QR session link for now. Student accounts can be considered later if the project needs identity, enrolment, or attendance history beyond the current university email validation.
+
+Session creators register through the registration form, and multiple people can have accounts. A person may create sessions for different courses; the course belongs to the session rather than restricting the account. Authentication uses a bcrypt password hash and an `httpOnly` JWT cookie; the password is never stored directly or returned to the browser. Set a long random `JWT_SECRET` in `server/.env` before production use.
 
 ## Run It
 
@@ -131,8 +144,8 @@ $env:NODE_ENV='test'; npm test --prefix server
 npm run build --prefix client
 ```
 
-The test suite will grow with authentication, protected-route, MongoDB subject, and reporting behavior.
+The test suite will grow with MongoDB subject and reporting behavior.
 
 ## Important MVP Limitations
 
-This version is for local learning only. Email text is not proof that a user owns the university account, and browser location can be inaccurate or manipulated. Admin routes are not protected yet, and subjects are not fully migrated to MongoDB. Do not use this version for official attendance. Proper admin authentication and authorization are the next security milestone.
+This version is for local learning only. Email text is not proof that a user owns the university account, and browser location can be inaccurate or manipulated. Subjects are not fully migrated to MongoDB, and further production hardening is still required. Do not use this version for official attendance.

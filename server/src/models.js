@@ -1,16 +1,31 @@
 import mongoose from 'mongoose';
 
-// Subjects are embedded into sessions as a snapshot so old sessions retain their original name/code.
-const subjectSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  code: { type: String, required: true },
+const adminUserSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  passwordHash: { type: String, required: true },
+  course: { type: String, required: true, trim: true },
+  courseDuration: { type: String, required: true, trim: true },
+  role: { type: String, enum: ['admin'], default: 'admin' },
 }, { timestamps: true });
+
+// Each admin has their own subject catalog scoped to their course, so one email cannot be reused for a different course.
+const subjectSchema = new mongoose.Schema({
+  adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', required: true },
+  course: { type: String, required: true, trim: true },
+  id: { type: String, required: true, unique: true },
+  name: { type: String, required: true, trim: true },
+  code: { type: String, required: true, trim: true },
+}, { timestamps: true });
+
+subjectSchema.index({ adminId: 1, course: 1, name: 1 }, { unique: true });
+subjectSchema.index({ adminId: 1, course: 1, code: 1 }, { unique: true, sparse: true });
 
 // A session stores the classroom location and expiry data needed during check-in.
 const sessionSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   token: { type: String, required: true, unique: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', required: false },
   subjectId: { type: String, required: true },
   subject: { type: Object, required: true },
   course: { type: String, required: true },
@@ -36,6 +51,7 @@ const attendanceRecordSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Reuse compiled models during hot reloads and test imports.
+export const AdminUser = mongoose.models.AdminUser || mongoose.model('AdminUser', adminUserSchema);
 export const Subject = mongoose.models.Subject || mongoose.model('Subject', subjectSchema);
 export const AttendanceSession = mongoose.models.AttendanceSession || mongoose.model('AttendanceSession', sessionSchema);
 export const AttendanceRecord = mongoose.models.AttendanceRecord || mongoose.model('AttendanceRecord', attendanceRecordSchema);

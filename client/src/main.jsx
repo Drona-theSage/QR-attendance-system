@@ -8,6 +8,7 @@ async function request(path, options = {}) {
   // Keep API calls consistent and turn server errors into user-facing messages.
   const response = await fetch(`${API_URL}${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options,
   });
   const data = await response.json();
@@ -65,6 +66,11 @@ function Admin() {
   const [customSubjectCode, setCustomSubjectCode] = useState('');
   const [session, setSession] = useState(null);
   const [error, setError] = useState('');
+
+  async function logout() {
+    await request('/auth/logout', { method: 'POST' });
+    window.location.reload();
+  }
 
   useEffect(() => {
     // Load the current subject catalog when the admin page opens.
@@ -127,6 +133,7 @@ function Admin() {
       <p className="intro">
         Create a short-lived QR session from the classroom location.
       </p>
+      <button type="button" className="secondary-button" onClick={logout}>Log out</button>
 
       {!session ? (
         <section className="panel">
@@ -188,6 +195,108 @@ function Admin() {
       )}
     </main>
   );
+}
+
+function Auth({ onAuthenticated }) {
+  const [mode, setMode] = useState('login');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [course, setCourse] = useState('');
+  const [courseDuration, setCourseDuration] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const body = { email, password };
+      if (mode === 'register') {
+        body.name = name;
+        body.course = course;
+        body.courseDuration = courseDuration;
+      }
+      const user = await request(`/auth/${mode}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      onAuthenticated(user);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="shell">
+      <p className="eyebrow">MVP / ADMIN ACCESS</p>
+      <h1>{mode === 'login' ? 'Welcome back.' : 'Create admin access.'}</h1>
+      <p className="intro">
+        {mode === 'login'
+          ? 'Sign in to create and monitor attendance sessions.'
+          : 'Register as a class representative or session creator.'}
+      </p>
+
+      <form className="panel" onSubmit={submit}>
+        {mode === 'register' && (
+          <>
+            <label>
+              Name
+              <input value={name} onChange={(event) => setName(event.target.value)} required />
+            </label>
+            <label>
+              Course
+              <input value={course} onChange={(event) => setCourse(event.target.value)} placeholder="e.g. BCA / MCA" required />
+            </label>
+            <label>
+              Course duration
+              <input value={courseDuration} onChange={(event) => setCourseDuration(event.target.value)} placeholder="e.g. 3 years / 2 semesters" required />
+            </label>
+          </>
+        )}
+        <label>
+          Email
+          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        </label>
+        <label>
+          Password
+          <input type="password" minLength="8" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        </label>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Create account'}
+        </button>
+        {error && <p className="error">{error}</p>}
+        <button
+          type="button"
+          className="link-button"
+          onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
+        >
+          {mode === 'login' ? 'Create a session creator account' : 'Back to admin login'}
+        </button>
+      </form>
+    </main>
+  );
+}
+
+function AdminGate() {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    request('/auth/me')
+      .then(setUser)
+      .catch(() => setUser(false))
+      .finally(() => setChecking(false));
+  }, []);
+
+  if (checking) {
+    return <main className="shell"><p className="intro">Checking admin access...</p></main>;
+  }
+  return user ? <Admin /> : <Auth onAuthenticated={setUser} />;
 }
 
 function Session({ session }) {
@@ -363,7 +472,7 @@ function App() {
   const path = window.location.pathname;
   const match = path.match(/^\/attendance\/([^/]+)/);
 
-  return match ? <Student token={match[1]} /> : <Admin />;
+  return match ? <Student token={match[1]} /> : <AdminGate />;
 }
 
 createRoot(document.getElementById('root')).render(
