@@ -1,11 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
 /* ================================================================
    Global page styles
    Applies to: :root, body, #root, headings, and shared text.
    ================================================================ */
 :root {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   color: #32150f;
   background: #7b1f18;
   line-height: 1.5;
@@ -44,7 +44,9 @@ h1 {
 
 .eyebrow {
   color: #b83220;
-  font: 500 12px 'DM Mono', monospace;
+  font:
+    500 12px "DM Mono",
+    monospace;
   letter-spacing: 2px;
 }
 
@@ -262,13 +264,17 @@ button:disabled {
 
 .status {
   color: #b83220;
-  font: 500 12px 'DM Mono', monospace;
+  font:
+    500 12px "DM Mono",
+    monospace;
 }
 
 .timer {
   margin: 25px 0;
   color: #b83220;
-  font: 500 4rem 'DM Mono', monospace;
+  font:
+    500 4rem "DM Mono",
+    monospace;
 }
 
 /* End of admin session layout styles. Next is QR and student-link styles. */
@@ -297,7 +303,9 @@ button:disabled {
 .url-label {
   margin-bottom: 8px;
   color: #b83220;
-  font: 500 12px 'DM Mono', monospace;
+  font:
+    500 12px "DM Mono",
+    monospace;
   letter-spacing: 2px;
 }
 
@@ -396,7 +404,9 @@ button:disabled {
 
 .summary-label {
   color: #b83220;
-  font: 500 12px 'DM Mono', monospace;
+  font:
+    500 12px "DM Mono",
+    monospace;
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
@@ -412,6 +422,24 @@ button:disabled {
 
 .student-checkin-form-panel label {
   color: #17110f;
+}
+
+.student-google-verification {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.student-google-label {
+  margin: 0 !important;
+  color: #17110f !important;
+  font-weight: 600;
+}
+
+.student-verified-email {
+  margin: 0 !important;
+  color: #2f6e45 !important;
+  font-size: 0.9rem;
 }
 
 .center {
