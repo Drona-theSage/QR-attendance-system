@@ -34,12 +34,17 @@ export async function verifyPassword(password, passwordHash) {
 export function createAuthCookie(userId) {
   // Keep the token inaccessible to JavaScript while allowing normal browser requests.
   const token = jwt.sign({ sub: userId }, jwtSecret(), { expiresIn: tokenLifetime });
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  return `${cookieName}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=28800${secure}`;
+  const productionAttributes = process.env.NODE_ENV === 'production'
+    ? '; SameSite=None; Secure'
+    : '; SameSite=Lax';
+  return `${cookieName}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=28800${productionAttributes}`;
 }
 
 export function clearAuthCookie() {
-  return `${cookieName}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`;
+  const productionAttributes = process.env.NODE_ENV === 'production'
+    ? '; SameSite=None; Secure'
+    : '; SameSite=Lax';
+  return `${cookieName}=; HttpOnly; Path=/; Max-Age=0${productionAttributes}`;
 }
 
 export function readAuthUserId(request) {
