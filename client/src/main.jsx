@@ -57,10 +57,28 @@ function useLocation() {
   return { ...state, locate };
 }
 
+async function downloadAttendance(token, sessionId) {
+  const response = await fetch(`${API_URL}/admin/sessions/${token}/export`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Unable to download attendance.');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `attendance-${sessionId}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function HistorySummary({ history }) {
   if (!history || history.sessions.length === 0) {
     return (
-      <section className="panel">
+      <section className="admin-history-panel">
         <h3>Session history</h3>
         <p className="muted">No sessions created yet.</p>
       </section>
@@ -68,7 +86,7 @@ function HistorySummary({ history }) {
   }
 
   return (
-    <section className="panel">
+    <section className="admin-history-panel">
       <h3>Session history</h3>
       <p className="muted">Total sessions: {history.totalSessions} · Total attendance: {history.totalAttendance}</p>
       <ul>
@@ -76,6 +94,15 @@ function HistorySummary({ history }) {
           <li key={item.token}>
             <strong>{item.course}</strong> · {item.subject?.name || 'Subject'} · {item.attendanceCount} present
             <div className="muted">{new Date(item.createdAt).toLocaleString()} · {item.status}</div>
+            {item.status === 'expired' && (
+              <button
+                type="button"
+                className="download-button"
+                onClick={() => downloadAttendance(item.token, item.id).catch((err) => window.alert(err.message))}
+              >
+                Download attendance list
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -96,7 +123,7 @@ function Admin() {
 
   async function logout() {
     await request('/auth/logout', { method: 'POST' });
-    window.location.reload();
+    window.location.assign('/');
   }
 
   async function deleteSubject(subjectIdToDelete) {
@@ -179,17 +206,17 @@ function Admin() {
   }
 
   return (
-    <main className="shell">
+    <main className="admin-console-page">
       <p className="eyebrow">MVP / ADMIN CONSOLE</p>
       <h1>Start attendance.</h1>
-      <p className="intro">
+      <p className="page-intro">
         Create a short-lived QR session from the classroom location.
       </p>
       <button type="button" className="secondary-button" onClick={logout}>Log out</button>
 
       {!session ? (
         <>
-          <section className="panel">
+          <section className="admin-session-setup-panel">
             <label>
               Course
               <input
@@ -310,12 +337,12 @@ function Auth({ onAuthenticated }) {
       : 'Enter your email to receive a password reset link.';
 
   return (
-    <main className="shell">
+    <main className="admin-auth-page">
       <p className="eyebrow">MVP / ADMIN ACCESS</p>
       <h1>{heading}</h1>
-      <p className="intro">{intro}</p>
+      <p className="page-intro">{intro}</p>
 
-      <form className="panel" onSubmit={submit}>
+      <form className={`admin-auth-form-panel auth-panel ${mode === 'register' ? 'admin-registration-form' : 'admin-login-form'}`} onSubmit={submit}>
         {mode === 'register' && (
           <>
             <label>
@@ -356,7 +383,7 @@ function Auth({ onAuthenticated }) {
             setSuccess('');
           }}
         >
-          {mode === 'login' ? 'Create a session creator account' : mode === 'register' ? 'Back to admin login' : 'Back to admin login'}
+          {mode === 'login' ? 'Signup' : mode === 'register' ? 'Back to admin login' : 'Back to admin login'}
         </button>
         {mode === 'login' && (
           <button
@@ -401,9 +428,9 @@ function ResetPassword() {
 
   if (!token) {
     return (
-      <main className="shell">
+      <main className="admin-reset-page">
         <p className="eyebrow">MVP / RESET PASSWORD</p>
-        <section className="panel">
+        <section className="admin-reset-error-panel">
           <p className="error">This reset link is missing a valid token.</p>
           <a href="/" className="link-button">Return to login</a>
         </section>
@@ -412,10 +439,10 @@ function ResetPassword() {
   }
 
   return (
-    <main className="shell">
+    <main className="admin-reset-page">
       <p className="eyebrow">MVP / RESET PASSWORD</p>
       <h1>Set a new password.</h1>
-      <form className="panel" onSubmit={submit}>
+      <form className="admin-reset-form-panel" onSubmit={submit}>
         <label>
           New password
           <input type="password" minLength="8" value={password} onChange={(event) => setPassword(event.target.value)} required />
@@ -443,7 +470,7 @@ function AdminGate() {
   }, []);
 
   if (checking) {
-    return <main className="shell"><p className="intro">Checking admin access...</p></main>;
+    return <main className="admin-loading-page"><p className="page-intro">Checking admin access...</p></main>;
   }
   return user ? <Admin /> : <Auth onAuthenticated={setUser} />;
 }
@@ -516,8 +543,8 @@ function Session({ session }) {
   const seconds = String(Math.floor(remaining / 1000) % 60).padStart(2, '0');
 
   return (
-    <section className="session-layout">
-      <div className="panel session-info">
+    <section className="admin-live-session-layout">
+      <div className="admin-session-info-panel">
         <span className="status">{remaining ? 'LIVE' : 'EXPIRED'}</span>
         <h2>{session.subject.code}</h2>
         <p>{session.course}</p>
@@ -526,9 +553,23 @@ function Session({ session }) {
           {minutes}:{seconds}
         </div>
         <p className="muted">Students present: {records.length}</p>
+        {!remaining && (
+          <div className="session-actions">
+            <button
+              type="button"
+              className="download-button"
+              onClick={() => downloadAttendance(session.token, session.id).catch((err) => window.alert(err.message))}
+            >
+              Download attendance list
+            </button>
+            <button type="button" className="home-button" onClick={() => window.location.assign('/')}>
+              Go to home
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="panel qr-panel">
+      <div className="admin-qr-panel">
         <img src={session.qrDataUrl} alt="Attendance QR code" />
         <p>Students scan this code to check in.</p>
 
@@ -543,7 +584,7 @@ function Session({ session }) {
         </div>
       </div>
 
-      <div className="panel">
+      <div className="admin-manual-attendance-panel">
         <h3>Manual attendance</h3>
         <form onSubmit={submitManualAttendance}>
           <label>
@@ -604,10 +645,10 @@ function Student({ token }) {
 
   if (done) {
     return (
-      <main className="shell center">
+      <main className="student-attendance-success-page centered-page">
         <span className="check">✓</span>
         <h1>Attendance marked.</h1>
-        <p className="intro">
+        <p className="page-intro">
           Your check-in was recorded for {session?.subject.name} in {session?.course}.
         </p>
       </main>
@@ -615,17 +656,17 @@ function Student({ token }) {
   }
 
   return (
-    <main className="shell">
+    <main className="student-attendance-page">
       <p className="eyebrow">MVP / STUDENT CHECK-IN</p>
       <h1>{session?.subject.code || 'Attendance'}</h1>
-      <p className="intro">
+      <p className="page-intro">
         {session
           ? 'Review the attendance session details before checking in.'
           : message || 'Loading session...'}
       </p>
 
       {session && (
-        <section className="session-summary" aria-label="Attendance session details">
+        <section className="student-session-summary" aria-label="Attendance session details">
           <div>
             <span className="summary-label">Subject</span>
             <strong>{session.subject.name}</strong>
@@ -637,7 +678,7 @@ function Student({ token }) {
         </section>
       )}
 
-      <section className="panel">
+      <section className="student-checkin-form-panel">
         <label>
           Full name
           <input

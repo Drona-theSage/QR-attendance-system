@@ -347,6 +347,42 @@ router.get("/admin/history", requireAdmin, async (request, response) => {
   });
 });
 
+router.get("/admin/sessions/:token/export", requireAdmin, async (request, response) => {
+  const session = await AttendanceSession.findOne({
+    token: request.params.token,
+    createdBy: request.adminUserId,
+  }).lean();
+
+  if (!session) {
+    return response.status(404).json({ error: "Session not found." });
+  }
+
+  if (new Date() < new Date(session.expiresAt)) {
+    return response.status(409).json({ error: "Attendance can be downloaded after the session expires." });
+  }
+
+  const records = await AttendanceRecord.find({ sessionToken: session.token })
+    .sort({ timestamp: 1 })
+    .lean();
+  const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const rows = [
+    ["Student Name", "Class Roll Number", "Subject", "Status", "Timestamp"],
+    ...records.map((record) => [
+      record.studentName,
+      record.studentRollNumber,
+      record.subject,
+      record.status,
+      record.timestamp ? new Date(record.timestamp).toISOString() : "",
+    ]),
+  ];
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  const filename = `attendance-${session.id}.csv`;
+
+  response.setHeader("Content-Type", "text/csv; charset=utf-8");
+  response.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return response.send(`\uFEFF${csv}\r\n`);
+});
+
 router.get("/admin/sessions/:token", requireAdmin, async (request, response) => {
   // The admin view uses this endpoint to refresh the current attendance list.
   const session = await AttendanceSession.findOne({ token: request.params.token }).lean();

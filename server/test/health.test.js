@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { app } from '../src/index.js';
 import { connectDb, disconnectDb } from '../src/db.js';
 import { createAuthCookie, hashPassword } from '../src/auth.js';
-import { AdminUser, AttendanceRecord, Subject } from '../src/models.js';
+import { AdminUser, AttendanceRecord, AttendanceSession, Subject } from '../src/models.js';
 
 let adminCookie;
 
@@ -519,4 +519,62 @@ test('admin can fetch session history and summary details', async (t) => {
   assert.equal(history.sessions[0].attendanceCount, 2);
   assert.equal(history.sessions[0].course, 'MCA Report Course');
   assert.ok(history.sessions[0].studentUrl.includes('/attendance/'));
+});
+
+test('admin can download attendance after a session expires', async (t) => {
+  const { server, port } = await startServer();
+  t.after(() => server.close());
+
+  const subjectResponse = await fetch(`http://localhost:${port}/api/admin/subjects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
+    body: JSON.stringify({ name: 'Export Subject', code: 'ES' }),
+  });
+  const subject = await subjectResponse.json();
+
+  const sessionResponse = await fetch(`http://localhost:${port}/api/admin/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
+    body: JSON.stringify({
+      subjectId: subject.id,
+      course: 'MCA Export Course',
+      latitude: 28.6139,
+      longitude: 77.209,
+    }),
+  });
+  const session = await sessionResponse.json();
+
+  const activeResponse = await fetch(`http://localhost:${port}/api/admin/sessions/${session.token}/export`, {
+    headers: { Cookie: adminCookie },
+  });
+  assert.equal(activeResponse.status, 409);
+
+  await AttendanceRecord.create({
+    sessionToken: session.token,
+    studentEmail: 'student@example.com',
+    studentName: 'Export Student',
+    studentRollNumber: 'ES-01',
+    subject: subject.name,
+    latitude: 28.6139,
+    longitude: 77.209,
+    accuracy: 10,
+    distance: 5,
+    status: 'present',
+  });
+  await AttendanceSession.updateOne(
+    { token: session.token },
+    { $set: { expiresAt: new Date(Date.now() - 1000) } },
+  );
+
+  const exportResponse = await fetch(`http://localhost:${port}/api/admin/sessions/${session.token}/export`, {
+    headers: { Cookie: adminCookie },
+  });
+  assert.equal(exportResponse.status, 200);
+  assert.match(exportResponse.headers.get('content-type') || '', /text\/csv/);
+  assert.match(exportResponse.headers.get('content-disposition') || '', /attendance-/i);
+  const csv = await exportResponse.text();
+  assert.match(csv, /"Student Name","Class Roll Number"/);
+  assert.match(csv, /Export Student/);
+  assert.match(csv, /ES-01/);
+  assert.doesNotMatch(csv, /student@example\.com/);
 });

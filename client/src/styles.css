@@ -1,5 +1,491 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-.session-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;border-left:4px solid #d45735;padding:4px 0 4px 18px;margin:28px 0 4px;max-width:520px}.session-summary div{display:grid;gap:4px}.summary-label{font:500 12px 'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;color:#65806f}.session-summary strong{font-size:1.05rem}
-@media(max-width:650px){.session-summary{grid-template-columns:1fr}}
-.secondary-button,.link-button{background:transparent;color:#d45735;padding:0;margin:0 0 20px}.link-button{font-size:.9rem;text-align:left;margin-top:18px}
-:root{font-family:'Space Grotesk',sans-serif;color:#13231e;background:#e8eee8;line-height:1.5;font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-width:320px;background:radial-gradient(circle at 85% 10%,#d1e3c9 0,transparent 35%),#e8eee8}.shell{max-width:900px;margin:0 auto;padding:9vh 24px}.eyebrow{font:500 12px 'DM Mono',monospace;letter-spacing:2px;color:#65806f}h1{font-size:clamp(3rem,8vw,6.5rem);line-height:.92;letter-spacing:-2px;max-width:650px;margin:18px 0}.intro{font-size:1.15rem;color:#557064;max-width:500px}.panel{background:#fbfcf7;border:1px solid #c8d4ca;padding:28px;box-shadow:8px 8px 0 #c8d4ca;margin-top:36px;max-width:520px}label{display:grid;gap:8px;font-weight:600;margin-bottom:22px}select,input{width:100%;font:inherit;padding:13px 14px;border:1px solid #a9bbae;background:#f3f7f0;color:#13231e;border-radius:2px}button{border:0;background:#d45735;color:white;padding:14px 20px;font:600 1rem inherit;cursor:pointer;border-radius:2px}button:disabled{opacity:.45;cursor:not-allowed}.error{color:#b13c2d;margin-top:18px}.session-layout{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}.session-info{margin-top:0}.session-info h2{font-size:3rem;margin:16px 0 0}.status{font:500 12px 'DM Mono',monospace;color:#d45735}.timer{font:500 4rem 'DM Mono',monospace;margin:25px 0}.muted,.qr-panel p{color:#65806f}.qr-panel{margin-top:0;text-align:center}.qr-panel img{width:min(100%,320px);image-rendering:auto}.student-url-box{margin-top:18px;text-align:left}.url-label{font:500 12px 'DM Mono',monospace;letter-spacing:2px;color:#65806f;margin-bottom:8px}.url-row{display:flex;gap:10px;align-items:center}.url-input{flex:1;min-width:0;background:#f3f7f0;border:1px solid #a9bbae;padding:11px 12px;font-size:.9rem}.copy-button{padding:11px 14px;white-space:nowrap}.center{text-align:center}.check{display:inline-grid;place-items:center;width:64px;height:64px;background:#7da66f;color:white;font-size:2rem;border-radius:50%}@media(max-width:650px){.shell{padding:40px 18px}.session-layout{grid-template-columns:1fr;gap:0}.qr-panel{margin-top:30px}h1{font-size:4rem}.url-row{flex-direction:column}.copy-button{width:100%}}
+
+/* ================================================================
+   Global page styles
+   Applies to: :root, body, #root, headings, and shared text.
+   ================================================================ */
+:root {
+  font-family: 'Space Grotesk', sans-serif;
+  color: #32150f;
+  background: #7b1f18;
+  line-height: 1.5;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: linear-gradient(135deg, #7b1f18 0%, #d84b24 46%, #f28b42 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  color: #fff8ef;
+}
+
+h1 {
+  max-width: 650px;
+  margin: 18px 0;
+  font-size: clamp(3rem, 8vw, 6.5rem);
+  line-height: 0.92;
+  letter-spacing: -2px;
+  text-shadow: 0 3px 0 #8f241a;
+}
+
+.eyebrow {
+  color: #b83220;
+  font: 500 12px 'DM Mono', monospace;
+  letter-spacing: 2px;
+}
+
+.page-intro {
+  max-width: 500px;
+  color: #6f4037;
+  font-size: 1.15rem;
+}
+
+.muted {
+  color: #6f4037;
+}
+
+/* End of global page styles. Next is the shared layout and panel styles. */
+
+/* ================================================================
+   Shared layout and panel styles
+  Applies to: page shells, named panels, labels, inputs, selects, and buttons.
+   ================================================================ */
+.admin-console-page,
+.admin-reset-page,
+.admin-loading-page,
+.student-attendance-page,
+.student-attendance-success-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: clamp(32px, 6vw, 72px) 24px;
+}
+
+.admin-history-panel,
+.admin-session-setup-panel,
+.admin-auth-form-panel,
+.admin-reset-error-panel,
+.admin-reset-form-panel,
+.admin-session-info-panel,
+.admin-qr-panel,
+.admin-manual-attendance-panel,
+.student-checkin-form-panel,
+.admin-auth-page {
+  max-width: 520px;
+  margin-top: 28px;
+  padding: 28px;
+  border: 1px solid #f3b39a;
+  border-radius: 8px;
+  background: #32150f;
+  box-shadow: 8px 8px 0 #b83b27;
+  color: #fff8ef;
+}
+
+.admin-history-panel h1,
+.admin-history-panel h2,
+.admin-history-panel h3,
+.admin-session-setup-panel h1,
+.admin-session-setup-panel h2,
+.admin-session-setup-panel h3,
+.admin-auth-form-panel h1,
+.admin-auth-form-panel h2,
+.admin-auth-form-panel h3,
+.admin-reset-error-panel h1,
+.admin-reset-error-panel h2,
+.admin-reset-error-panel h3,
+.admin-reset-form-panel h1,
+.admin-reset-form-panel h2,
+.admin-reset-form-panel h3,
+.admin-session-info-panel h1,
+.admin-session-info-panel h2,
+.admin-session-info-panel h3,
+.admin-qr-panel h1,
+.admin-qr-panel h2,
+.admin-qr-panel h3,
+.admin-manual-attendance-panel h1,
+.admin-manual-attendance-panel h2,
+.admin-manual-attendance-panel h3,
+.student-checkin-form-panel h1,
+.student-checkin-form-panel h2,
+.student-checkin-form-panel h3 {
+  color: #fff8ef;
+}
+
+.admin-history-panel p,
+.admin-history-panel .muted,
+.admin-session-setup-panel p,
+.admin-session-setup-panel .muted,
+.admin-auth-form-panel p,
+.admin-auth-form-panel .muted,
+.admin-reset-error-panel p,
+.admin-reset-error-panel .muted,
+.admin-reset-form-panel p,
+.admin-reset-form-panel .muted,
+.admin-session-info-panel p,
+.admin-session-info-panel .muted,
+.admin-qr-panel p,
+.admin-qr-panel .muted,
+.admin-manual-attendance-panel p,
+.admin-manual-attendance-panel .muted,
+.student-checkin-form-panel p,
+.student-checkin-form-panel .muted {
+  color: #f8d8c7;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 22px;
+  color: #17110f;
+  font-weight: 600;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #e49b7d;
+  border-radius: 2px;
+  background: #fffdf9;
+  color: #17110f;
+  font: inherit;
+}
+
+button {
+  min-height: 52px;
+  padding: 15px 26px;
+  border: 0;
+  border-radius: 5px;
+  background: #b83220;
+  box-shadow: 0 4px 0 #6f1b14;
+  color: #fff;
+  cursor: pointer;
+  font: 700 1rem inherit;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+}
+
+button:hover:not(:disabled) {
+  background: #8f241a;
+  box-shadow: 0 5px 0 #6f1b14;
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.error {
+  margin-top: 18px;
+  color: #ffb4a4;
+}
+
+.success {
+  color: #c7f0d1 !important;
+}
+
+/* End of shared layout and panel styles. Next is admin authentication. */
+
+/* ================================================================
+   Admin authentication styles
+  Applies to: .admin-auth-form-panel, signup, forgot-password, and auth links.
+   ================================================================ */
+.admin-auth-form-panel {
+  display: flex;
+  flex-direction: column;
+  max-width: 620px;
+  gap: 12px;
+}
+
+.admin-auth-form-panel .link-button,
+.admin-auth-form-panel .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin: 0;
+  padding: 13px 22px;
+  background: #b83220;
+  color: #fff;
+  text-align: center;
+}
+
+.admin-auth-form-panel .link-button:hover,
+.admin-auth-form-panel .secondary-button:hover {
+  background: #8f241a;
+}
+
+.link-button,
+.secondary-button {
+  color: #fff;
+}
+
+/* End of admin authentication styles. Next is admin session layout. */
+
+/* ================================================================
+   Admin session layout styles
+  Applies to: .admin-live-session-layout, .admin-session-info-panel, and session metadata.
+   ================================================================ */
+.admin-live-session-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 480px);
+  max-width: 1120px;
+  gap: 24px;
+  align-items: start;
+}
+
+.admin-session-info-panel {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  margin-top: 0;
+}
+
+.admin-session-info-panel h2 {
+  margin: 16px 0 0;
+  color: #8f241a;
+  font-size: 3rem;
+}
+
+.status {
+  color: #b83220;
+  font: 500 12px 'DM Mono', monospace;
+}
+
+.timer {
+  margin: 25px 0;
+  color: #b83220;
+  font: 500 4rem 'DM Mono', monospace;
+}
+
+/* End of admin session layout styles. Next is QR and student-link styles. */
+
+/* ================================================================
+   QR panel and student-link styles
+  Applies to: .admin-qr-panel, QR image, .student-url-box, and .url-row.
+   ================================================================ */
+.admin-qr-panel {
+  grid-column: 2;
+  grid-row: 1;
+  margin-top: 0;
+  text-align: center;
+}
+
+.admin-qr-panel img {
+  width: min(100%, 320px);
+  image-rendering: auto;
+}
+
+.student-url-box {
+  margin-top: 18px;
+  text-align: left;
+}
+
+.url-label {
+  margin-bottom: 8px;
+  color: #b83220;
+  font: 500 12px 'DM Mono', monospace;
+  letter-spacing: 2px;
+}
+
+.url-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.url-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  background: #fffdf9;
+  font-size: 0.9rem;
+}
+
+.copy-button {
+  min-height: 46px;
+  padding: 12px 18px;
+  white-space: nowrap;
+}
+
+/* End of QR panel and student-link styles. Next is manual attendance. */
+
+/* ================================================================
+   Manual attendance styles
+  Applies to: .admin-manual-attendance-panel and its admin-only attendance form.
+   ================================================================ */
+.admin-manual-attendance-panel {
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: 0;
+}
+
+.admin-manual-attendance-panel label {
+  color: #17110f;
+}
+
+/* End of manual attendance styles. Next is expired-session actions. */
+
+/* ================================================================
+   Expired-session action styles
+   Applies to: .session-actions, .download-button, and .home-button.
+   ================================================================ */
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.session-actions button {
+  margin: 0;
+}
+
+.download-button {
+  margin-top: 10px;
+  padding: 12px 18px;
+  background: #8f241a;
+  font-size: 0.9rem;
+}
+
+.download-button:hover {
+  background: #6f1b14;
+}
+
+.home-button {
+  background: #6f4037;
+}
+
+.home-button:hover:not(:disabled) {
+  background: #512d27;
+}
+
+/* End of expired-session action styles. Next is history and student view. */
+
+/* ================================================================
+   History and student attendance styles
+  Applies to: .student-session-summary, .student-checkin-form-panel, centered success page, and .check.
+   ================================================================ */
+.student-session-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 520px;
+  gap: 18px;
+  margin: 28px 0 4px;
+  padding: 4px 0 4px 18px;
+  border-left: 4px solid #d45735;
+}
+
+.student-session-summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.summary-label {
+  color: #b83220;
+  font: 500 12px 'DM Mono', monospace;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.student-session-summary strong {
+  font-size: 1.05rem;
+}
+
+.student-checkin-form-panel {
+  max-width: 620px;
+  margin-top: 28px;
+}
+
+.student-checkin-form-panel label {
+  color: #17110f;
+}
+
+.center {
+  text-align: center;
+}
+
+.check {
+  display: inline-grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 50%;
+  background: #7da66f;
+  color: #fff;
+  font-size: 2rem;
+}
+
+/* End of history and student attendance styles. Next is responsive layout. */
+
+/* ================================================================
+   Responsive layout styles
+   Applies to: session grid, summary grid, shell, panels, and timer.
+   ================================================================ */
+@media (max-width: 760px) {
+  .admin-console-page,
+  .admin-auth-page,
+  .admin-reset-page,
+  .admin-loading-page,
+  .student-attendance-page,
+  .student-attendance-success-page {
+    padding: 32px 16px;
+  }
+
+  .admin-history-panel,
+  .admin-session-setup-panel,
+  .admin-auth-form-panel,
+  .admin-reset-error-panel,
+  .admin-reset-form-panel,
+  .admin-session-info-panel,
+  .admin-qr-panel,
+  .admin-manual-attendance-panel,
+  .student-checkin-form-panel {
+    padding: 22px;
+  }
+
+  .admin-live-session-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-session-info-panel,
+  .admin-qr-panel,
+  .admin-manual-attendance-panel {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .admin-session-info-panel h2 {
+    font-size: 2.4rem;
+  }
+
+  .timer {
+    font-size: 3rem;
+  }
+}
+
+@media (max-width: 650px) {
+  .student-session-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .url-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* End of responsive layout styles. CSS file complete. */

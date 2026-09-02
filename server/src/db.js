@@ -18,7 +18,7 @@ export async function connectDb() {
     family: 4,
   });
 
-  console.log(`MongoDB connected: ${mongoUri}`);
+  console.log('MongoDB connected successfully.');
   return mongoose.connection;
 }
 
